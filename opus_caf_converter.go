@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
-	"math"
 	"os"
 
 	"github.com/sirupsen/logrus"
@@ -664,7 +663,7 @@ func (o *OggReader) ParseNextPage() ([][]byte, *OggPageHeader, error) {
 		}
 	}
 
-	segments := [][]byte{}
+	segments := make([][]byte, 0, len(newArr))
 
 	for _, s := range newArr {
 		segment := make([]byte, int(s))
@@ -678,21 +677,10 @@ func (o *OggReader) ParseNextPage() ([][]byte, *OggPageHeader, error) {
 	return segments, pageHeader, nil
 }
 
-func ConvertOpusToCaf(i string, o string) {
-	file, err := os.Open(i)
-	if err != nil {
-		panic(err)
-	}
-
-	ogg, header, err := NewWith(file)
-	if err != nil {
-		panic(err)
-	}
-
+func readOpusData(ogg *OggReader) ([]byte, []uint64, int) {
 	audioData := []byte{}
 	frame_size := 0
 	trailing_data := make([]uint64, 0)
-	packetTableLength := 24
 
 	for {
 		segments, header, err := ogg.ParseNextPage()
@@ -709,35 +697,35 @@ func ConvertOpusToCaf(i string, o string) {
 
 		for i := range segments {
 			trailing_data = append(trailing_data, uint64(len(segments[i])))
-
 			audioData = append(audioData, segments[i]...)
 		}
 
 		if header.index == 2 {
 			tmpPacket := segments[0]
 			if len(tmpPacket) > 0 {
-				tmptoc := tmpPacket[0] & 255
-
+				tmptoc := int(tmpPacket[0] & 255)
 				tocConfig := tmptoc >> 3
 
-				length := uint32(tocConfig & 3)
-
-				if tocConfig < 12 {
-					frame_size = int(math.Max(480, float64(960*length)))
-				} else if tocConfig < 16 {
+				switch {
+				case tocConfig < 12:
+					frame_size = 960 * (tocConfig&3 + 1)
+				case tocConfig < 16:
 					frame_size = 480 << (tocConfig & 1)
-				} else {
+				default:
 					frame_size = 120 << (tocConfig & 3)
 				}
 			}
 		}
 	}
-	len_audio := len(audioData)
-	packets := len(trailing_data)
-	frames := frame_size * packets
 
-	// Check how much chunk size is needed each segment by BER encoding
-	for i := 0; i < packets; i++ {
+	return audioData, trailing_data, frame_size
+}
+
+func calculatePacketTableLength(trailing_data []uint64) int {
+	packetTableLength := 24
+
+	// // Check how much chunk size is needed each segment by BER encoding
+	for i := 0; i < len(trailing_data); i++ {
 		value := uint32(trailing_data[i])
 		numBytes := 0
 		if (value & 0x7f) == value {
@@ -753,6 +741,15 @@ func ConvertOpusToCaf(i string, o string) {
 		}
 		packetTableLength += numBytes
 	}
+	return packetTableLength
+}
+
+func buildCafFile(header *OggHeader, audioData []byte, trailing_data []uint64, frame_size int) *File {
+	len_audio := len(audioData)
+	packets := len(trailing_data)
+	frames := frame_size * packets
+
+	packetTableLength := calculatePacketTableLength(trailing_data)
 
 	cf := &File{}
 	cf.FileHeader = FileHeader{FileType: FourByteString{99, 97, 102, 102}, FileVersion: 1, FileFlags: 0}
@@ -802,12 +799,29 @@ func ConvertOpusToCaf(i string, o string) {
 
 	cf.Chunks = append(cf.Chunks, c4)
 
+	return cf
+}
+
+func ConvertOpusToCaf(inputFile string, outputFile string) {
+	file, err := os.Open(inputFile)
+	if err != nil {
+		panic(err)
+	}
+
+	ogg, header, err := NewWith(file)
+	if err != nil {
+		panic(err)
+	}
+
+	audioData, trailing_data, frame_size := readOpusData(ogg)
+	cf := buildCafFile(header, audioData, trailing_data, frame_size)
+
 	outputBuffer := &bytes.Buffer{}
 	if cf.Encode(outputBuffer) != nil {
 		return
 	}
 	output := outputBuffer.Bytes()
-	outfile, err := os.Create(o)
+	outfile, err := os.Create(outputFile)
 	if err != nil {
 		return
 	}
