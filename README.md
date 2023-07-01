@@ -19,6 +19,13 @@ func main() {
     ConvertOpusToCaf(inputOpus, outputCaf)
 }
 ```
+
+## Running through cli
+```sh
+go install github.com/nabil6339/opus_caf_converter@latest
+opus_caf_converter input.opus output.caf
+```
+
 ## Dependencies
 This script relies on the following external packages:
 
