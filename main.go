@@ -2,7 +2,8 @@ package main
 
 import (
 	"flag"
-	"nabil6339/opus-caf/caf"
+
+	"github.com/nabil6391/opus_caf_converter/caf"
 )
 
 func main() {

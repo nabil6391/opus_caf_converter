@@ -1,4 +1,4 @@
-module nabil6339/opus-caf
+module github.com/nabil6391/opus_caf_converter
 
 go 1.19
 
