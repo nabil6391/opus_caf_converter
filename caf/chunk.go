@@ -10,7 +10,7 @@ import (
 
 type Chunk struct {
 	Header   ChunkHeader
-	Contents interface{}
+	Contents any
 }
 
 func (c *Chunk) decode(r *bufio.Reader) error {
@@ -18,7 +18,7 @@ func (c *Chunk) decode(r *bufio.Reader) error {
 		return err
 	}
 	switch c.Header.ChunkType {
-	case ChunkTypeAudioDescription:
+	case ChunkeAudioDescription:
 		{
 			var cc AudioFormat
 			if err := cc.decode(r); err != nil {
@@ -27,7 +27,7 @@ func (c *Chunk) decode(r *bufio.Reader) error {
 			c.Contents = &cc
 			break
 		}
-	case ChunkTypeChannelLayout:
+	case ChunkChannelLayout:
 		{
 			var cc ChannelLayout
 			if err := cc.decode(r); err != nil {
@@ -36,7 +36,7 @@ func (c *Chunk) decode(r *bufio.Reader) error {
 			c.Contents = &cc
 			break
 		}
-	case ChunkTypeInformation:
+	case ChunkInformation:
 		{
 			var cc CAFStringsChunk
 			if err := cc.decode(r); err != nil {
@@ -45,7 +45,7 @@ func (c *Chunk) decode(r *bufio.Reader) error {
 			c.Contents = &cc
 			break
 		}
-	case ChunkTypeAudioData:
+	case ChunkAudioData:
 		{
 			var cc DataX
 			if err := cc.decode(r, c.Header); err != nil {
@@ -53,7 +53,7 @@ func (c *Chunk) decode(r *bufio.Reader) error {
 			}
 			c.Contents = &cc
 		}
-	case ChunkTypePacketTable:
+	case ChunkPacketTable:
 		{
 			var cc PacketTable
 			if err := cc.decode(r); err != nil {
@@ -61,7 +61,7 @@ func (c *Chunk) decode(r *bufio.Reader) error {
 			}
 			c.Contents = &cc
 		}
-	case ChunkTypeMidi:
+	case ChunkMidi:
 		{
 			var cc Midi
 			ba := make([]byte, c.Header.ChunkSize)
@@ -89,7 +89,7 @@ func (c *Chunk) Encode(w io.Writer) error {
 		return err
 	}
 	switch c.Header.ChunkType {
-	case ChunkTypeAudioDescription:
+	case ChunkeAudioDescription:
 		{
 			cc := c.Contents.(*AudioFormat)
 			if err := cc.encode(w); err != nil {
@@ -97,7 +97,7 @@ func (c *Chunk) Encode(w io.Writer) error {
 			}
 			break
 		}
-	case ChunkTypeChannelLayout:
+	case ChunkChannelLayout:
 		{
 			cc := c.Contents.(*ChannelLayout)
 			if err := cc.encode(w); err != nil {
@@ -105,7 +105,7 @@ func (c *Chunk) Encode(w io.Writer) error {
 			}
 			break
 		}
-	case ChunkTypeInformation:
+	case ChunkInformation:
 		{
 			cc := c.Contents.(*CAFStringsChunk)
 			if err := cc.encode(w); err != nil {
@@ -113,7 +113,7 @@ func (c *Chunk) Encode(w io.Writer) error {
 			}
 			break
 		}
-	case ChunkTypeAudioData:
+	case ChunkAudioData:
 		{
 			cc := c.Contents.(*DataX)
 			if err := cc.encode(w); err != nil {
@@ -121,7 +121,7 @@ func (c *Chunk) Encode(w io.Writer) error {
 			}
 			c.Contents = &cc
 		}
-	case ChunkTypePacketTable:
+	case ChunkPacketTable:
 		{
 			cc := c.Contents.(*PacketTable)
 			if err := cc.encode(w); err != nil {
@@ -129,7 +129,7 @@ func (c *Chunk) Encode(w io.Writer) error {
 			}
 			c.Contents = &cc
 		}
-	case ChunkTypeMidi:
+	case ChunkMidi:
 		{
 			midi := c.Contents.(Midi)
 			if _, err := w.Write(midi); err != nil {

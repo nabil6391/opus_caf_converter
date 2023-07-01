@@ -11,7 +11,7 @@ func (h *FileHeader) Decode(r io.Reader) error {
 	if err != nil {
 		return err
 	}
-	if h.FileType != stringToChunkType("caff") {
+	if h.FileType != NewFourByteStr("caff") {
 		return errors.New("invalid caff header")
 	}
 	return nil

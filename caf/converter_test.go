@@ -5,6 +5,8 @@ import (
 	"os"
 	"os/exec"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestBasicCafEncodingDecoding(t *testing.T) {
@@ -39,7 +41,8 @@ func TestBasicCafEncodingDecoding(t *testing.T) {
 }
 
 func TestConversion(t *testing.T) {
-	ConvertOpusToCaf("samples/sample4.opus", "samples/sample4.caf")
+	err := ConvertOpusToCaf("samples/sample4.opus", "samples/sample4.caf")
+	require.NoError(t, err)
 }
 
 func TestCompareCafFFMpeg(t *testing.T) {
