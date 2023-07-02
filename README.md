@@ -13,12 +13,23 @@ Example usage:
 ```go
 package main
 
+import (
+    "github.com/nabil6391/opus_caf_converter/caf"
+)
+
 func main() {
     inputOpus := "input.opus"
     outputCaf := "output.caf"
-    ConvertOpusToCaf(inputOpus, outputCaf)
+    caf.ConvertOpusToCaf(inputOpus, outputCaf)
 }
 ```
+
+## Running through cli
+```sh
+go install github.com/nabil6391/opus_caf_converter@latest
+opus_caf_converter input.opus output.caf
+```
+
 ## Dependencies
 This script relies on the following external packages:
 
