@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"log"
 	"os"
 )
 
@@ -40,6 +41,12 @@ func ConvertOpusToCaf(inputFile string, outputFile string) error {
 		return err
 	}
 
+	defer func() {
+		if err := file.Close(); err != nil {
+			log.Println("error closing the file", err)
+		}
+	}()
+
 	ogg, header, err := newWith(file)
 	if err != nil {
 		return err
@@ -59,7 +66,11 @@ func ConvertOpusToCaf(inputFile string, outputFile string) error {
 		return err
 	}
 
-	defer outfile.Close()
+	defer func() {
+		if err := outfile.Close(); err != nil {
+			log.Println("error closing the file", err)
+		}
+	}()
 
 	_, err = outfile.Write(output)
 	if err != nil {
