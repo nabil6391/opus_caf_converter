@@ -77,13 +77,13 @@ func (o *OggReader) ParseNextPage() ([][]byte, *OggPageHeader, error) {
 	}
 
 	pageHeader := &OggPageHeader{
-		sig:           [4]byte{h[0], h[1], h[2], h[3]},
-		version:       h[4],
-		headerType:    h[5],
+		sig:             [4]byte{h[0], h[1], h[2], h[3]},
+		version:         h[4],
+		headerType:      h[5],
 		GranulePosition: binary.LittleEndian.Uint64(h[6:14]),
-		serial:        binary.LittleEndian.Uint32(h[14:18]),
-		index:         binary.LittleEndian.Uint32(h[18:22]),
-		segmentsCount: h[26],
+		serial:          binary.LittleEndian.Uint32(h[14:18]),
+		index:           binary.LittleEndian.Uint32(h[18:22]),
+		segmentsCount:   h[26],
 	}
 
 	sizeBuffer := make([]byte, pageHeader.segmentsCount)

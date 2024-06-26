@@ -7,7 +7,7 @@ import (
 
 type CAFFileData struct {
 	CAFFileHeader CAFFileHeader
-	Chunks     []CAFChunk
+	Chunks        []CAFChunk
 }
 
 func (cf *CAFFileData) Decode(r io.Reader) error {

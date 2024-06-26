@@ -14,10 +14,9 @@ type CAFPacketTable struct {
 type CAFPacketTableHeader struct {
 	NumberPackets     int64
 	NumberValidFrames int64
-	PrimingFrames    int32
+	PrimingFrames     int32
 	RemainderFrames   int32
 }
-
 
 func (c *CAFPacketTable) decode(r *bufio.Reader) error {
 	if err := binary.Read(r, binary.BigEndian, &c.Header); err != nil {
