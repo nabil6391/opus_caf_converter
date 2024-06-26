@@ -47,12 +47,11 @@ func TestBasicCafEncodingDecoding(t *testing.T) {
 
 	duration := time.Since(startTime)
 	runtime.ReadMemStats(&m)
-	allocatedMemory := m.Alloc - startAlloc
+	allocatedMemory := float64(m.Alloc-startAlloc) / (1024 * 1024) // Convert to MB
 
 	t.Logf("Test duration: %v", duration)
-	t.Logf("Allocated memory: %d bytes", allocatedMemory)
+	t.Logf("Allocated memory: %.2f MB", allocatedMemory)
 }
-
 
 func TestCompareCafFFMpeg(t *testing.T) {
 	startTime := time.Now()
@@ -63,6 +62,8 @@ func TestCompareCafFFMpeg(t *testing.T) {
 	inputFile := "samples/sample_large.opus"
 	outputFileFFmpeg := "samples/sample_large.caf"
 	outputFileCode := "output_large_sample.caf"
+
+	defer os.Remove(outputFileCode) // Clean up file after test
 
 	err := ConvertOpusToCaf(inputFile, outputFileCode)
 	require.NoError(t, err)
@@ -77,15 +78,15 @@ func TestCompareCafFFMpeg(t *testing.T) {
 
 	duration := time.Since(startTime)
 	runtime.ReadMemStats(&m)
-	allocatedMemory := m.Alloc - startAlloc
+	allocatedMemory := float64(m.Alloc-startAlloc) / (1024 * 1024) // Convert to MB
 
 	t.Logf("Test duration: %v", duration)
-	t.Logf("Allocated memory: %d bytes", allocatedMemory)
+	t.Logf("Allocated memory: %.2f MB", allocatedMemory)
 }
 
 func TestConversionWithDifferentOptions(t *testing.T) {
 	testCases := []struct {
-		name     string
+		name      string
 		inputFile string
 	}{
 		{"tiny_no_sound", "samples/tiny.opus"},
@@ -101,6 +102,8 @@ func TestConversionWithDifferentOptions(t *testing.T) {
 			startAlloc := m.Alloc
 
 			outputFile := "output_" + tc.name + ".caf"
+			defer os.Remove(outputFile) // Clean up file after test
+
 			err := ConvertOpusToCaf(tc.inputFile, outputFile)
 			require.NoError(t, err)
 
@@ -113,19 +116,19 @@ func TestConversionWithDifferentOptions(t *testing.T) {
 
 			duration := time.Since(startTime)
 			runtime.ReadMemStats(&m)
-			allocatedMemory := m.Alloc - startAlloc
+			allocatedMemory := float64(m.Alloc-startAlloc) / (1024 * 1024) // Convert to MB
 
 			t.Logf("Test duration: %v", duration)
-			t.Logf("Allocated memory: %d bytes", allocatedMemory)
+			t.Logf("Allocated memory: %.2f MB", allocatedMemory)
 		})
 	}
 }
 
 func TestConversionWithDifferentChannels(t *testing.T) {
 	testCases := []struct {
-		name     string
+		name      string
 		inputFile string
-		channels int
+		channels  int
 	}{
 		{"Mono", "samples/sample_mono_48000.opus", 1},
 		{"Stereo", "samples/sample_stereo.opus", 2},
@@ -140,6 +143,8 @@ func TestConversionWithDifferentChannels(t *testing.T) {
 			startAlloc := m.Alloc
 
 			outputFile := "output_" + tc.name + ".caf"
+			defer os.Remove(outputFile) // Clean up file after test
+
 			err := ConvertOpusToCaf(tc.inputFile, outputFile)
 			require.NoError(t, err)
 
@@ -152,14 +157,13 @@ func TestConversionWithDifferentChannels(t *testing.T) {
 
 			duration := time.Since(startTime)
 			runtime.ReadMemStats(&m)
-			allocatedMemory := m.Alloc - startAlloc
+			allocatedMemory := float64(m.Alloc-startAlloc) / (1024 * 1024) // Convert to MB
 
 			t.Logf("Test duration: %v", duration)
-			t.Logf("Allocated memory: %d bytes", allocatedMemory)
+			t.Logf("Allocated memory: %.2f MB", allocatedMemory)
 		})
 	}
 }
-
 
 func TestConversionWithLargeFile(t *testing.T) {
 	startTime := time.Now()
@@ -169,6 +173,7 @@ func TestConversionWithLargeFile(t *testing.T) {
 
 	inputFile := "samples/sample_large.opus"
 	outputFile := "output_sample_large.caf"
+	defer os.Remove(outputFile) // Clean up file after test
 
 	err := ConvertOpusToCaf(inputFile, outputFile)
 	require.NoError(t, err)
@@ -180,10 +185,10 @@ func TestConversionWithLargeFile(t *testing.T) {
 
 	duration := time.Since(startTime)
 	runtime.ReadMemStats(&m)
-	allocatedMemory := m.Alloc - startAlloc
+	allocatedMemory := float64(m.Alloc-startAlloc) / (1024 * 1024) // Convert to MB
 
 	t.Logf("Test duration: %v", duration)
-	t.Logf("Allocated memory: %d bytes", allocatedMemory)
+	t.Logf("Allocated memory: %.2f MB", allocatedMemory)
 }
 
 func TestInvalidInputFile(t *testing.T) {
@@ -197,8 +202,8 @@ func TestInvalidInputFile(t *testing.T) {
 
 	duration := time.Since(startTime)
 	runtime.ReadMemStats(&m)
-	allocatedMemory := m.Alloc - startAlloc
+	allocatedMemory := float64(m.Alloc-startAlloc) / (1024 * 1024) // Convert to MB
 
 	t.Logf("Test duration: %v", duration)
-	t.Logf("Allocated memory: %d bytes", allocatedMemory)
+	t.Logf("Allocated memory: %.2f MB", allocatedMemory)
 }
