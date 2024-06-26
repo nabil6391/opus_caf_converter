@@ -10,10 +10,7 @@ type OggReader struct {
 	stream io.Reader
 }
 
-// OggHeader is the metadata from the first two pages
-// in the file (ID and Comment)
-//
-// https://tools.ietf.org/html/rfc7845.html#section-3
+// OggHeader is the metadata from the first two pages in the file (ID and Comment)
 type OggHeader struct {
 	ChannelMap uint8
 	Channels   uint8
@@ -24,18 +21,14 @@ type OggHeader struct {
 }
 
 // OggPageHeader is the metadata for a Page
-// Pages are the fundamental unit of multiplexing in an Ogg stream
-//
-// https://tools.ietf.org/html/rfc7845.html#section-1
 type OggPageHeader struct {
 	GranulePosition uint64
-
-	sig           [4]byte
-	version       uint8
-	headerType    uint8
-	serial        uint32
-	index         uint32
-	segmentsCount uint8
+	sig             [4]byte
+	version         uint8
+	headerType      uint8
+	serial          uint32
+	index           uint32
+	segmentsCount   uint8
 }
 
 func (o *OggReader) readHeaders() (*OggHeader, error) {
@@ -84,50 +77,34 @@ func (o *OggReader) ParseNextPage() ([][]byte, *OggPageHeader, error) {
 	}
 
 	pageHeader := &OggPageHeader{
-		sig: [4]byte{h[0], h[1], h[2], h[3]},
+		sig:           [4]byte{h[0], h[1], h[2], h[3]},
+		version:       h[4],
+		headerType:    h[5],
+		GranulePosition: binary.LittleEndian.Uint64(h[6:14]),
+		serial:        binary.LittleEndian.Uint32(h[14:18]),
+		index:         binary.LittleEndian.Uint32(h[18:22]),
+		segmentsCount: h[26],
 	}
-
-	pageHeader.version = h[4]
-	pageHeader.headerType = h[5]
-	pageHeader.GranulePosition = binary.LittleEndian.Uint64(h[6 : 6+8])
-	pageHeader.serial = binary.LittleEndian.Uint32(h[14 : 14+4])
-	pageHeader.index = binary.LittleEndian.Uint32(h[18 : 18+4])
-	pageHeader.segmentsCount = h[26]
 
 	sizeBuffer := make([]byte, pageHeader.segmentsCount)
 	if _, err = io.ReadFull(o.stream, sizeBuffer); err != nil {
 		return nil, nil, err
 	}
 
-	newArr := make([]int, 0)
-	// Iteraring throug all segments to check if there are lacing packets.
-	//  If a segment is 255 bytes long, it means that there must be a following segment for the same packet (which may be again 255 bytes long)
-	for i := 0; i < len(sizeBuffer); i++ {
-		if sizeBuffer[i] == 255 {
-			sum := int(sizeBuffer[i])
-			i++
-			for i < len(sizeBuffer) && sizeBuffer[i] == 255 {
-				sum += int(sizeBuffer[i])
-				i++
+	segments := make([][]byte, 0, pageHeader.segmentsCount)
+	var currentSegment []byte
+	var segmentSize int
+
+	for _, size := range sizeBuffer {
+		segmentSize += int(size)
+		if size < 255 {
+			currentSegment = make([]byte, segmentSize)
+			if _, err = io.ReadFull(o.stream, currentSegment); err != nil {
+				return nil, nil, err
 			}
-			if i < len(sizeBuffer) {
-				sum += int(sizeBuffer[i])
-			}
-			newArr = append(newArr, sum)
-		} else {
-			newArr = append(newArr, int(sizeBuffer[i]))
+			segments = append(segments, currentSegment)
+			segmentSize = 0
 		}
-	}
-
-	segments := make([][]byte, 0, len(newArr))
-
-	for _, s := range newArr {
-		segment := make([]byte, int(s))
-		if _, err = io.ReadFull(o.stream, segment); err != nil {
-			return nil, nil, err
-		}
-
-		segments = append(segments, segment)
 	}
 
 	return segments, pageHeader, nil
