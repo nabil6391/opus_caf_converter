@@ -4,84 +4,94 @@ import (
 	"bytes"
 	"os"
 	"runtime"
+	"runtime/debug"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 )
 
-func TestBasicCafEncodingDecoding(t *testing.T) {
-	startTime := time.Now()
+// memoryUsage returns the current memory usage in bytes
+func memoryUsage() uint64 {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
-	startAlloc := m.Alloc
+	return m.Alloc
+}
 
-	contents, err := os.ReadFile("samples/sample_large.caf")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(contents) == 0 {
-		t.Fatal("testing with empty file")
-	}
-	reader := bytes.NewReader(contents)
-	f := &CAFFileData{}
-	if err := f.Decode(reader); err != nil {
-		t.Fatal(err)
-	}
-	outputBuffer := &bytes.Buffer{}
-	if err := f.Encode(outputBuffer); err != nil {
-		t.Fatal(err)
-	}
-	if outputBuffer.Len() != len(contents) {
-		t.Errorf("contents of input differ when decoding and reencoding, before: %d after: %d",
-			len(contents),
-			outputBuffer.Len())
-	}
-	output := outputBuffer.Bytes()
-	for i := 0; i < len(contents); i++ {
-		if output[i] != contents[i] {
-			t.Errorf("contents of input differ when decoding and reencoding starting at offset %d", i)
-			break
-		}
-	}
+func runTest(t *testing.T, name string, testFunc func()) {
+	runtime.GC()
+	time.Sleep(time.Second) // Allow GC to complete
 
+	startTime := time.Now()
+	startMemory := memoryUsage()
+
+	// Disable GC
+	debug.SetGCPercent(-1)
+	defer debug.SetGCPercent(100)
+
+	testFunc()
+
+	endMemory := memoryUsage()
 	duration := time.Since(startTime)
-	runtime.ReadMemStats(&m)
-	allocatedMemory := float64(m.Alloc-startAlloc) / (1024 * 1024) // Convert to MB
 
-	t.Logf("Test duration: %v", duration)
-	t.Logf("Allocated memory: %.2f MB", allocatedMemory)
+	memoryChange := int64(endMemory - startMemory)
+
+	t.Logf("%s - Duration: %v", name, duration)
+	t.Logf("%s - Memory change: %d bytes", name, memoryChange)
+}
+
+func TestBasicCafEncodingDecoding(t *testing.T) {
+	runTest(t, "TestBasicCafEncodingDecoding", func() {
+		contents, err := os.ReadFile("samples/sample_large.caf")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(contents) == 0 {
+			t.Fatal("testing with empty file")
+		}
+		reader := bytes.NewReader(contents)
+		f := &CAFFileData{}
+		if err := f.Decode(reader); err != nil {
+			t.Fatal(err)
+		}
+		outputBuffer := &bytes.Buffer{}
+		if err := f.Encode(outputBuffer); err != nil {
+			t.Fatal(err)
+		}
+		if outputBuffer.Len() != len(contents) {
+			t.Errorf("contents of input differ when decoding and reencoding, before: %d after: %d",
+				len(contents),
+				outputBuffer.Len())
+		}
+		output := outputBuffer.Bytes()
+		for i := 0; i < len(contents); i++ {
+			if output[i] != contents[i] {
+				t.Errorf("contents of input differ when decoding and reencoding starting at offset %d", i)
+				break
+			}
+		}
+	})
 }
 
 func TestCompareCafFFMpeg(t *testing.T) {
-	startTime := time.Now()
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
-	startAlloc := m.Alloc
+	runTest(t, "TestCompareCafFFMpeg", func() {
+		inputFile := "samples/sample_large.opus"
+		outputFileFFmpeg := "samples/sample_large.caf"
+		outputFileCode := "output_large_sample.caf"
 
-	inputFile := "samples/sample_large.opus"
-	outputFileFFmpeg := "samples/sample_large.caf"
-	outputFileCode := "output_large_sample.caf"
+		defer os.Remove(outputFileCode) // Clean up file after test
 
-	defer os.Remove(outputFileCode) // Clean up file after test
+		err := ConvertOpusToCaf(inputFile, outputFileCode)
+		require.NoError(t, err)
 
-	err := ConvertOpusToCaf(inputFile, outputFileCode)
-	require.NoError(t, err)
+		contents1, err := os.ReadFile(outputFileFFmpeg)
+		require.NoError(t, err)
+		contents2, err := os.ReadFile(outputFileCode)
+		require.NoError(t, err)
 
-	contents1, err := os.ReadFile(outputFileFFmpeg)
-	require.NoError(t, err)
-	contents2, err := os.ReadFile(outputFileCode)
-	require.NoError(t, err)
-
-	require.Equal(t, len(contents1), len(contents2), "File sizes differ")
-	require.Equal(t, contents1, contents2, "File contents differ")
-
-	duration := time.Since(startTime)
-	runtime.ReadMemStats(&m)
-	allocatedMemory := float64(m.Alloc-startAlloc) / (1024 * 1024) // Convert to MB
-
-	t.Logf("Test duration: %v", duration)
-	t.Logf("Allocated memory: %.2f MB", allocatedMemory)
+		require.Equal(t, len(contents1), len(contents2), "File sizes differ")
+		require.Equal(t, contents1, contents2, "File contents differ")
+	})
 }
 
 func TestConversionWithDifferentOptions(t *testing.T) {
@@ -96,30 +106,18 @@ func TestConversionWithDifferentOptions(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			startTime := time.Now()
-			var m runtime.MemStats
-			runtime.ReadMemStats(&m)
-			startAlloc := m.Alloc
+			runTest(t, "TestConversionWithDifferentOptions/"+tc.name, func() {
+				outputFile := "output_" + tc.name + ".caf"
+				defer os.Remove(outputFile) // Clean up file after test
 
-			outputFile := "output_" + tc.name + ".caf"
-			defer os.Remove(outputFile) // Clean up file after test
+				err := ConvertOpusToCaf(tc.inputFile, outputFile)
+				require.NoError(t, err)
 
-			err := ConvertOpusToCaf(tc.inputFile, outputFile)
-			require.NoError(t, err)
-
-			// Verify the output file exists and has content
-			outputStats, err := os.Stat(outputFile)
-			require.NoError(t, err)
-			require.True(t, outputStats.Size() > 0, "Output file is empty")
-
-			// TODO: Add more specific checks for sample rate conversion if needed
-
-			duration := time.Since(startTime)
-			runtime.ReadMemStats(&m)
-			allocatedMemory := float64(m.Alloc-startAlloc) / (1024 * 1024) // Convert to MB
-
-			t.Logf("Test duration: %v", duration)
-			t.Logf("Allocated memory: %.2f MB", allocatedMemory)
+				// Verify the output file exists and has content
+				outputStats, err := os.Stat(outputFile)
+				require.NoError(t, err)
+				require.True(t, outputStats.Size() > 0, "Output file is empty")
+			})
 		})
 	}
 }
@@ -137,73 +135,41 @@ func TestConversionWithDifferentChannels(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			startTime := time.Now()
-			var m runtime.MemStats
-			runtime.ReadMemStats(&m)
-			startAlloc := m.Alloc
+			runTest(t, "TestConversionWithDifferentChannels/"+tc.name, func() {
+				outputFile := "output_" + tc.name + ".caf"
+				defer os.Remove(outputFile) // Clean up file after test
 
-			outputFile := "output_" + tc.name + ".caf"
-			defer os.Remove(outputFile) // Clean up file after test
+				err := ConvertOpusToCaf(tc.inputFile, outputFile)
+				require.NoError(t, err)
 
-			err := ConvertOpusToCaf(tc.inputFile, outputFile)
-			require.NoError(t, err)
-
-			// Verify the output file exists and has content
-			outputStats, err := os.Stat(outputFile)
-			require.NoError(t, err)
-			require.True(t, outputStats.Size() > 0, "Output file is empty")
-
-			// TODO: Add checks to verify the number of channels in the output file
-
-			duration := time.Since(startTime)
-			runtime.ReadMemStats(&m)
-			allocatedMemory := float64(m.Alloc-startAlloc) / (1024 * 1024) // Convert to MB
-
-			t.Logf("Test duration: %v", duration)
-			t.Logf("Allocated memory: %.2f MB", allocatedMemory)
+				// Verify the output file exists and has content
+				outputStats, err := os.Stat(outputFile)
+				require.NoError(t, err)
+				require.True(t, outputStats.Size() > 0, "Output file is empty")
+			})
 		})
 	}
 }
 
 func TestConversionWithLargeFile(t *testing.T) {
-	startTime := time.Now()
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
-	startAlloc := m.Alloc
+	runTest(t, "TestConversionWithLargeFile", func() {
+		inputFile := "samples/sample_large.opus"
+		outputFile := "output_sample_large.caf"
+		defer os.Remove(outputFile) // Clean up file after test
 
-	inputFile := "samples/sample_large.opus"
-	outputFile := "output_sample_large.caf"
-	defer os.Remove(outputFile) // Clean up file after test
+		err := ConvertOpusToCaf(inputFile, outputFile)
+		require.NoError(t, err)
 
-	err := ConvertOpusToCaf(inputFile, outputFile)
-	require.NoError(t, err)
-
-	// Verify the output file exists and has content
-	outputStats, err := os.Stat(outputFile)
-	require.NoError(t, err)
-	require.True(t, outputStats.Size() > 0, "Output file is empty")
-
-	duration := time.Since(startTime)
-	runtime.ReadMemStats(&m)
-	allocatedMemory := float64(m.Alloc-startAlloc) / (1024 * 1024) // Convert to MB
-
-	t.Logf("Test duration: %v", duration)
-	t.Logf("Allocated memory: %.2f MB", allocatedMemory)
+		// Verify the output file exists and has content
+		outputStats, err := os.Stat(outputFile)
+		require.NoError(t, err)
+		require.True(t, outputStats.Size() > 0, "Output file is empty")
+	})
 }
 
 func TestInvalidInputFile(t *testing.T) {
-	startTime := time.Now()
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
-	startAlloc := m.Alloc
-
-	err := ConvertOpusToCaf("non_existent_file.opus", "output.caf")
-	require.Error(t, err)
-
-	duration := time.Since(startTime)
-	runtime.ReadMemStats(&m)
-	allocatedMemory := float64(m.Alloc-startAlloc) / (1024 * 1024) // Convert to MB
-
-	t.Logf("Test duration: %v", duration)
-	t.Logf("Allocated memory: %.2f MB", allocatedMemory)
+	runTest(t, "TestInvalidInputFile", func() {
+		err := ConvertOpusToCaf("non_existent_file.opus", "output.caf")
+		require.Error(t, err)
+	})
 }
