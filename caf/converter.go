@@ -52,8 +52,8 @@ func ConvertOpusToCaf(inputFile string, outputFile string) error {
 		return err
 	}
 
-	audioData, trailing_data, frame_size := readOpusData(ogg)
-	cf := buildCafFile(header, audioData, trailing_data, frame_size)
+	audioData, trailingData, frameSize := readOpusData(ogg)
+	cf := buildCafFile(header, audioData, trailingData, frameSize)
 
 	outputBuffer := &bytes.Buffer{}
 	if cf.Encode(outputBuffer) != nil {
@@ -101,8 +101,8 @@ func newWith(in io.Reader) (*OggReader, *OggHeader, error) {
 
 func readOpusData(ogg *OggReader) ([]byte, []uint64, int) {
 	audioData := []byte{}
-	frame_size := 0
-	trailing_data := make([]uint64, 0)
+	trailingData := make([]uint64, 0)
+	frameSize := 0
 
 	for {
 		segments, header, err := ogg.ParseNextPage()
@@ -114,12 +114,18 @@ func readOpusData(ogg *OggReader) ([]byte, []uint64, int) {
 		}
 
 		if err != nil {
-			panic(err)
+			log.Printf("Error parsing Ogg page: %v", err)
+			break
 		}
 
-		for i := range segments {
-			trailing_data = append(trailing_data, uint64(len(segments[i])))
-			audioData = append(audioData, segments[i]...)
+		for _, segment := range segments {
+			if err != nil {
+				log.Printf("Error parsing Opus packet: %v", err)
+				continue
+			}
+
+			trailingData = append(trailingData, uint64(len(segment)))
+			audioData = append(audioData, segment...)
 		}
 
 		if header.index == 2 {
@@ -130,17 +136,17 @@ func readOpusData(ogg *OggReader) ([]byte, []uint64, int) {
 
 				switch {
 				case tocConfig < 12:
-					frame_size = 960 * (tocConfig&3 + 1)
+					frameSize = 960 * (tocConfig&3 + 1)
 				case tocConfig < 16:
-					frame_size = 480 << (tocConfig & 1)
+					frameSize = 480 << (tocConfig & 1)
 				default:
-					frame_size = 120 << (tocConfig & 3)
+					frameSize = 120 << (tocConfig & 3)
 				}
 			}
 		}
 	}
 
-	return audioData, trailing_data, frame_size
+	return audioData, trailingData, frameSize
 }
 
 func calculatePacketTableLength(trailing_data []uint64) int {
@@ -166,19 +172,19 @@ func calculatePacketTableLength(trailing_data []uint64) int {
 	return packetTableLength
 }
 
-func buildCafFile(header *OggHeader, audioData []byte, trailing_data []uint64, frame_size int) *CAFFileData {
-	len_audio := len(audioData)
-	packets := len(trailing_data)
-	frames := frame_size * packets
+func buildCafFile(header *OggHeader, audioData []byte, trailingData []uint64, frameSize int) *CAFFileData {
+	lenAudio := len(audioData)
+	packets := len(trailingData)
+	frames := frameSize * packets
 
-	packetTableLength := calculatePacketTableLength(trailing_data)
+	packetTableLength := calculatePacketTableLength(trailingData)
 
 	cf := &CAFFileData{}
 	cf.CAFFileHeader = CAFFileHeader{FileType: FourByteString{99, 97, 102, 102}, FileVersion: 1, FileFlags: 0}
 
 	c := CAFChunk{
 		Header:   CAFChunkHeader{ChunkType: ChunkeAudioDescription, ChunkSize: 32},
-		Contents: &CAFAudioFormat{SampleRate: 48000, FormatID: FourByteString{111, 112, 117, 115}, FormatFlags: 0x00000000, BytesPerPacket: 0, FramesPerPacket: uint32(frame_size), BitsPerChannel: 0, ChannelsPerPacket: uint32(header.Channels)},
+		Contents: &CAFAudioFormat{SampleRate: 48000, FormatID: FourByteString{111, 112, 117, 115}, FormatFlags: 0x00000000, BytesPerPacket: 0, FramesPerPacket: uint32(frameSize), BitsPerChannel: 0, ChannelsPerPacket: uint32(header.Channels)},
 	}
 
 	cf.Chunks = append(cf.Chunks, c)
@@ -199,7 +205,7 @@ func buildCafFile(header *OggHeader, audioData []byte, trailing_data []uint64, f
 
 	cf.Chunks = append(cf.Chunks, c2)
 	c3 := CAFChunk{
-		Header:   CAFChunkHeader{ChunkType: ChunkAudioData, ChunkSize: int64(len_audio + 4)},
+		Header:   CAFChunkHeader{ChunkType: ChunkAudioData, ChunkSize: int64(lenAudio + 4)},
 		Contents: &DataX{Bytes: audioData},
 	}
 
@@ -209,7 +215,7 @@ func buildCafFile(header *OggHeader, audioData []byte, trailing_data []uint64, f
 		Header: CAFChunkHeader{ChunkType: ChunkPacketTable, ChunkSize: int64(packetTableLength)},
 		Contents: &CAFPacketTable{
 			Header: CAFPacketTableHeader{NumberPackets: int64(packets), NumberValidFrames: int64(frames), PrimingFrames: 0, RemainderFrames: 0},
-			Entry:  trailing_data,
+			Entry:  trailingData,
 		},
 	}
 
@@ -217,3 +223,4 @@ func buildCafFile(header *OggHeader, audioData []byte, trailing_data []uint64, f
 
 	return cf
 }
+
