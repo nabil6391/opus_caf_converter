@@ -1,6 +1,7 @@
 package caf
 
 import (
+	"bytes"
 	"os"
 	"runtime"
 	"runtime/debug"

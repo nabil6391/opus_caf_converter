@@ -4,29 +4,8 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"io"
 	"os"
-)
-
-// Opus Decoding
-const (
-	pageHeaderTypeBeginningOfStream = 0x02
-	pageHeaderSignature             = "OggS"
-
-	idPageSignature = "OpusHead"
-
-	pageHeaderLen       = 27
-	idPagePayloadLength = 19
-)
-
-var (
-	errNilStream                 = errors.New("stream is nil")
-	errBadIDPageSignature        = errors.New("bad header signature")
-	errBadIDPageType             = errors.New("wrong header, expected beginning of stream")
-	errBadIDPageLength           = errors.New("payload for id page must be 19 bytes")
-	errBadIDPagePayloadSignature = errors.New("bad payload signature")
-	errShortPageHeader           = errors.New("not enough data for payload header")
 )
 
 var ChunkeAudioDescription = NewFourByteStr("desc")
@@ -100,17 +79,19 @@ func ConvertOpusToCaf(inputFile string, outputFile string) error {
 		return err
 	}
 
+	infoChunkSize := int64(25)
 	// Write information chunk
 	infoChunk := CAFChunk{
-		Header:   CAFChunkHeader{ChunkType: ChunkInformation, ChunkSize: 26},
-		Contents: &CAFStringsChunk{NumEntries: 1, Strings: []Information{{Key: "encoder\x00", Value: "Lavf59.27.100\x00"}}},
+		Header:   CAFChunkHeader{ChunkType: ChunkInformation, ChunkSize: infoChunkSize},
+		Contents: &CAFStringsChunk{NumEntries: 1, Strings: []Information{{Key: "encoder\x00", Value: "Lavf60.3.100\x00"}}},
 	}
 	if err := infoChunk.Encode(bufferedWriter); err != nil {
 		return err
 	}
 
+	dataOffset := bufferedWriter.Buffered()
 	// Write audio data chunk header
-	dataChunkHeader := CAFChunkHeader{ChunkType: ChunkAudioData, ChunkSize: 3395136} // Use -1 for unknown size
+	dataChunkHeader := CAFChunkHeader{ChunkType: ChunkAudioData, ChunkSize: -1} // Use -1 for unknown size
 	if err := binary.Write(bufferedWriter, binary.BigEndian, &dataChunkHeader); err != nil {
 		return err
 	}
@@ -198,7 +179,7 @@ func ConvertOpusToCaf(inputFile string, outputFile string) error {
 	}
 
 	// Update data chunk size
-	if _, err := outFile.Seek(118, io.SeekStart); err != nil {
+	if _, err := outFile.Seek(int64(dataOffset + 4) , io.SeekStart); err != nil {
 		return err
 	}
 	if err := binary.Write(outFile, binary.BigEndian, totalBytes+4); err != nil {

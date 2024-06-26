@@ -4,10 +4,28 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"io"
-	"log"
 	"strings"
+)
+
+// Opus Decoding
+const (
+	pageHeaderTypeBeginningOfStream = 0x02
+	pageHeaderSignature             = "OggS"
+
+	idPageSignature = "OpusHead"
+
+	pageHeaderLen       = 27
+	idPagePayloadLength = 19
+)
+
+var (
+	errNilStream                 = errors.New("stream is nil")
+	errBadIDPageSignature        = errors.New("bad header signature")
+	errBadIDPageType             = errors.New("wrong header, expected beginning of stream")
+	errBadIDPageLength           = errors.New("payload for id page must be 19 bytes")
+	errBadIDPagePayloadSignature = errors.New("bad payload signature")
+	errShortPageHeader           = errors.New("not enough data for payload header")
 )
 
 // OggReader is used to read Ogg files and return page payloads
