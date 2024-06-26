@@ -11,6 +11,14 @@ type PacketTable struct {
 	Entry  []uint64
 }
 
+type PacketTableHeader struct {
+	NumberPackets     int64
+	NumberValidFrames int64
+	PrimingFramess    int32
+	RemainderFrames   int32
+}
+
+
 func (c *PacketTable) decode(r *bufio.Reader) error {
 	if err := binary.Read(r, binary.BigEndian, &c.Header); err != nil {
 		return err

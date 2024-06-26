@@ -6,6 +6,12 @@ import (
 	"io"
 )
 
+type FileHeader struct {
+	FileType    FourByteString
+	FileVersion int16
+	FileFlags   int16
+}
+
 func (h *FileHeader) Decode(r io.Reader) error {
 	err := binary.Read(r, binary.BigEndian, h)
 	if err != nil {

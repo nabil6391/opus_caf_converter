@@ -12,6 +12,12 @@ type ChannelLayout struct {
 	Channels                  []ChannelDescription
 }
 
+type ChannelDescription struct {
+	ChannelLabel uint32
+	ChannelFlags uint32
+	Coordinates  [3]float32
+}
+
 func (c *ChannelLayout) decode(r io.Reader) error {
 	if err := binary.Read(r, binary.BigEndian, &c.ChannelLayoutTag); err != nil {
 		return err

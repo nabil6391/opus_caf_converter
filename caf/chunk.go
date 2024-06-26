@@ -13,6 +13,18 @@ type Chunk struct {
 	Contents any
 }
 
+type ChunkHeader struct {
+	ChunkType FourByteString
+	ChunkSize int64
+}
+
+type UnknownContents struct {
+	Data []byte
+}
+
+type Midi = []byte
+
+
 func (c *Chunk) decode(r *bufio.Reader) error {
 	if err := binary.Read(r, binary.BigEndian, &c.Header); err != nil {
 		return err
