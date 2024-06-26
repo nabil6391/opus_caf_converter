@@ -6,13 +6,13 @@ import (
 	"io"
 )
 
-type FileHeader struct {
+type CAFFileHeader struct {
 	FileType    FourByteString
 	FileVersion int16
 	FileFlags   int16
 }
 
-func (h *FileHeader) Decode(r io.Reader) error {
+func (h *CAFFileHeader) Decode(r io.Reader) error {
 	err := binary.Read(r, binary.BigEndian, h)
 	if err != nil {
 		return err
@@ -23,7 +23,7 @@ func (h *FileHeader) Decode(r io.Reader) error {
 	return nil
 }
 
-func (h *FileHeader) Encode(w io.Writer) error {
+func (h *CAFFileHeader) Encode(w io.Writer) error {
 	err := binary.Write(w, binary.BigEndian, h)
 	if err != nil {
 		return err

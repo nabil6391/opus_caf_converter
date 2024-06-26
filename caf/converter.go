@@ -166,55 +166,49 @@ func calculatePacketTableLength(trailing_data []uint64) int {
 	return packetTableLength
 }
 
-func buildCafFile(header *OggHeader, audioData []byte, trailing_data []uint64, frame_size int) *FileData {
+func buildCafFile(header *OggHeader, audioData []byte, trailing_data []uint64, frame_size int) *CAFFileData {
 	len_audio := len(audioData)
 	packets := len(trailing_data)
 	frames := frame_size * packets
 
 	packetTableLength := calculatePacketTableLength(trailing_data)
 
-	cf := &FileData{}
-	cf.FileHeader = FileHeader{FileType: FourByteString{99, 97, 102, 102}, FileVersion: 1, FileFlags: 0}
+	cf := &CAFFileData{}
+	cf.CAFFileHeader = CAFFileHeader{FileType: FourByteString{99, 97, 102, 102}, FileVersion: 1, FileFlags: 0}
 
-	c := Chunk{
-		Header:   ChunkHeader{ChunkType: ChunkeAudioDescription, ChunkSize: 32},
-		Contents: &AudioFormat{SampleRate: 48000, FormatID: FourByteString{111, 112, 117, 115}, FormatFlags: 0x00000000, BytesPerPacket: 0, FramesPerPacket: uint32(frame_size), BitsPerChannel: 0, ChannelsPerPacket: uint32(header.Channels)},
+	c := CAFChunk{
+		Header:   CAFChunkHeader{ChunkType: ChunkeAudioDescription, ChunkSize: 32},
+		Contents: &CAFAudioFormat{SampleRate: 48000, FormatID: FourByteString{111, 112, 117, 115}, FormatFlags: 0x00000000, BytesPerPacket: 0, FramesPerPacket: uint32(frame_size), BitsPerChannel: 0, ChannelsPerPacket: uint32(header.Channels)},
 	}
 
 	cf.Chunks = append(cf.Chunks, c)
-	var channelLayoutTag uint32
-	if header.Channels == 2 {
-		channelLayoutTag = 6619138 // kAudioChannelLayoutTag_Stereo
-	} else {
-		channelLayoutTag = 6553601 // kAudioChannelLayoutTag_Mono
-	}
 
-	c1 := Chunk{
-		Header: ChunkHeader{ChunkType: ChunkChannelLayout, ChunkSize: 12},
-		Contents: &ChannelLayout{ChannelLayoutTag: channelLayoutTag, ChannelBitmap: 0x0, NumberChannelDescriptions: 0,
-			Channels: []ChannelDescription{},
+	c1 := CAFChunk{
+		Header: CAFChunkHeader{ChunkType: ChunkChannelLayout, ChunkSize: 12},
+		Contents: &CAFChannelLayout{ChannelLayoutTag: GetChannelLayoutForChannels(uint32(header.Channels)), ChannelBitmap: 0x0, NumberChannelDescriptions: 0,
+			Channels: []CAFChannelDescription{},
 		},
 	}
 
 	cf.Chunks = append(cf.Chunks, c1)
 
-	c2 := Chunk{
-		Header:   ChunkHeader{ChunkType: ChunkInformation, ChunkSize: 26},
+	c2 := CAFChunk{
+		Header:   CAFChunkHeader{ChunkType: ChunkInformation, ChunkSize: 26},
 		Contents: &CAFStringsChunk{NumEntries: 1, Strings: []Information{{Key: "encoder\x00", Value: "Lavf59.27.100\x00"}}},
 	}
 
 	cf.Chunks = append(cf.Chunks, c2)
-	c3 := Chunk{
-		Header:   ChunkHeader{ChunkType: ChunkAudioData, ChunkSize: int64(len_audio + 4)},
+	c3 := CAFChunk{
+		Header:   CAFChunkHeader{ChunkType: ChunkAudioData, ChunkSize: int64(len_audio + 4)},
 		Contents: &DataX{Bytes: audioData},
 	}
 
 	cf.Chunks = append(cf.Chunks, c3)
 
-	c4 := Chunk{
-		Header: ChunkHeader{ChunkType: ChunkPacketTable, ChunkSize: int64(packetTableLength)},
-		Contents: &PacketTable{
-			Header: PacketTableHeader{NumberPackets: int64(packets), NumberValidFrames: int64(frames), PrimingFramess: 0, RemainderFrames: 0},
+	c4 := CAFChunk{
+		Header: CAFChunkHeader{ChunkType: ChunkPacketTable, ChunkSize: int64(packetTableLength)},
+		Contents: &CAFPacketTable{
+			Header: CAFPacketTableHeader{NumberPackets: int64(packets), NumberValidFrames: int64(frames), PrimingFrames: 0, RemainderFrames: 0},
 			Entry:  trailing_data,
 		},
 	}

@@ -6,20 +6,20 @@ import (
 	"io"
 )
 
-type PacketTable struct {
-	Header PacketTableHeader
+type CAFPacketTable struct {
+	Header CAFPacketTableHeader
 	Entry  []uint64
 }
 
-type PacketTableHeader struct {
+type CAFPacketTableHeader struct {
 	NumberPackets     int64
 	NumberValidFrames int64
-	PrimingFramess    int32
+	PrimingFrames    int32
 	RemainderFrames   int32
 }
 
 
-func (c *PacketTable) decode(r *bufio.Reader) error {
+func (c *CAFPacketTable) decode(r *bufio.Reader) error {
 	if err := binary.Read(r, binary.BigEndian, &c.Header); err != nil {
 		return err
 	}
@@ -33,7 +33,7 @@ func (c *PacketTable) decode(r *bufio.Reader) error {
 	return nil
 }
 
-func (c *PacketTable) encode(w io.Writer) error {
+func (c *CAFPacketTable) encode(w io.Writer) error {
 	if err := binary.Write(w, binary.BigEndian, c.Header); err != nil {
 		return err
 	}

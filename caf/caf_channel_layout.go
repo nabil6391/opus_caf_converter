@@ -5,20 +5,25 @@ import (
 	"io"
 )
 
-type ChannelLayout struct {
+const (
+	kCAFChannelLayoutTag_Mono   = 100<<16 | 1
+	kCAFChannelLayoutTag_Stereo = 101<<16 | 2
+)
+
+type CAFChannelLayout struct {
 	ChannelLayoutTag          uint32
 	ChannelBitmap             uint32
 	NumberChannelDescriptions uint32
-	Channels                  []ChannelDescription
+	Channels                  []CAFChannelDescription
 }
 
-type ChannelDescription struct {
+type CAFChannelDescription struct {
 	ChannelLabel uint32
 	ChannelFlags uint32
 	Coordinates  [3]float32
 }
 
-func (c *ChannelLayout) decode(r io.Reader) error {
+func (c *CAFChannelLayout) decode(r io.Reader) error {
 	if err := binary.Read(r, binary.BigEndian, &c.ChannelLayoutTag); err != nil {
 		return err
 	}
@@ -29,7 +34,7 @@ func (c *ChannelLayout) decode(r io.Reader) error {
 		return err
 	}
 	for i := uint32(0); i < c.NumberChannelDescriptions; i++ {
-		var channelDesc ChannelDescription
+		var channelDesc CAFChannelDescription
 		if err := binary.Read(r, binary.BigEndian, &channelDesc); err != nil {
 			return err
 		}
@@ -38,7 +43,7 @@ func (c *ChannelLayout) decode(r io.Reader) error {
 	return nil
 }
 
-func (c *ChannelLayout) encode(w io.Writer) error {
+func (c *CAFChannelLayout) encode(w io.Writer) error {
 	if err := binary.Write(w, binary.BigEndian, &c.ChannelLayoutTag); err != nil {
 		return err
 	}
@@ -54,4 +59,16 @@ func (c *ChannelLayout) encode(w io.Writer) error {
 		}
 	}
 	return nil
+}
+
+func GetChannelLayoutForChannels(channels uint32) uint32 {
+	switch channels {
+	case 1:
+		return kCAFChannelLayoutTag_Mono
+	case 2:
+		return kCAFChannelLayoutTag_Stereo
+	// Add more cases as needed
+	default:
+		return 0 // Unknown layout
+	}
 }

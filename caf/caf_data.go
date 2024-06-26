@@ -11,7 +11,7 @@ type DataX struct {
 	Bytes     []byte
 }
 
-func (c *DataX) decode(r *bufio.Reader, h ChunkHeader) error {
+func (c *DataX) decode(r *bufio.Reader, h CAFChunkHeader) error {
 	if err := binary.Read(r, binary.BigEndian, &c.EditCount); err != nil {
 		return err
 	}

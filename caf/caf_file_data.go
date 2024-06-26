@@ -5,20 +5,20 @@ import (
 	"io"
 )
 
-type FileData struct {
-	FileHeader FileHeader
-	Chunks     []Chunk
+type CAFFileData struct {
+	CAFFileHeader CAFFileHeader
+	Chunks     []CAFChunk
 }
 
-func (cf *FileData) Decode(r io.Reader) error {
+func (cf *CAFFileData) Decode(r io.Reader) error {
 	bufferedReader := bufio.NewReader(r)
-	var fileHeader FileHeader
+	var fileHeader CAFFileHeader
 	if err := fileHeader.Decode(bufferedReader); err != nil {
 		return err
 	}
-	cf.FileHeader = fileHeader
+	cf.CAFFileHeader = fileHeader
 	for {
-		var c Chunk
+		var c CAFChunk
 		if err := c.decode(bufferedReader); err == io.EOF {
 			break
 		} else if err != nil {
@@ -29,8 +29,8 @@ func (cf *FileData) Decode(r io.Reader) error {
 	return nil
 }
 
-func (cf *FileData) Encode(w io.Writer) error {
-	if err := cf.FileHeader.Encode(w); err != nil {
+func (cf *CAFFileData) Encode(w io.Writer) error {
+	if err := cf.CAFFileHeader.Encode(w); err != nil {
 		return err
 	}
 	for _, c := range cf.Chunks {

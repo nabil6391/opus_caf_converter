@@ -24,7 +24,7 @@ func TestBasicCafEncodingDecoding(t *testing.T) {
 		t.Fatal("testing with empty file")
 	}
 	reader := bytes.NewReader(contents)
-	f := &FileData{}
+	f := &CAFFileData{}
 	if err := f.Decode(reader); err != nil {
 		t.Fatal(err)
 	}

@@ -5,7 +5,7 @@ import (
 	"io"
 )
 
-type AudioFormat struct {
+type CAFAudioFormat struct {
 	SampleRate        float64
 	FormatID          FourByteString
 	FormatFlags       uint32
@@ -15,10 +15,10 @@ type AudioFormat struct {
 	BitsPerChannel    uint32
 }
 
-func (c *AudioFormat) decode(r io.Reader) error {
+func (c *CAFAudioFormat) decode(r io.Reader) error {
 	return binary.Read(r, binary.BigEndian, c)
 }
 
-func (c *AudioFormat) encode(w io.Writer) error {
+func (c *CAFAudioFormat) encode(w io.Writer) error {
 	return binary.Write(w, binary.BigEndian, c)
 }
