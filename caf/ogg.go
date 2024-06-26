@@ -1,8 +1,13 @@
 package caf
 
 import (
+	"bytes"
 	"encoding/binary"
+	"errors"
+	"fmt"
 	"io"
+	"log"
+	"strings"
 )
 
 // OggReader is used to read Ogg files and return page payloads
@@ -108,4 +113,78 @@ func (o *OggReader) ParseNextPage() ([][]byte, *OggPageHeader, error) {
 	}
 
 	return segments, pageHeader, nil
+}
+
+
+
+func parseOpusTags(segment []byte) string {
+	r := bytes.NewReader(segment[8:]) // Skip "OpusTags"
+
+	// Read vendor string length
+	var vendorLength uint32
+	if err := binary.Read(r, binary.LittleEndian, &vendorLength); err != nil {
+		return ""
+	}
+
+	// Skip vendor string
+	if _, err := r.Seek(int64(vendorLength), io.SeekCurrent); err != nil {
+		return ""
+	}
+
+	// Read user comment list length
+	var commentListLength uint32
+	if err := binary.Read(r, binary.LittleEndian, &commentListLength); err != nil {
+		return ""
+	}
+
+	// Read user comments
+	for i := uint32(0); i < commentListLength; i++ {
+		var commentLength uint32
+		if err := binary.Read(r, binary.LittleEndian, &commentLength); err != nil {
+			return ""
+		}
+
+		commentBytes := make([]byte, commentLength)
+		if _, err := io.ReadFull(r, commentBytes); err != nil {
+			return ""
+		}
+		comment := string(commentBytes)
+		if strings.HasPrefix(comment, "ENCODER=") {
+			return strings.TrimPrefix(comment, "ENCODER=")
+		}	}
+
+	return ""
+}
+
+
+func calculateFrameSize(tocByte int) uint32 {
+	tocConfig := tocByte >> 3
+
+	switch {
+	case tocConfig < 12:
+		return 960 * (uint32(tocConfig)&3 + 1)
+	case tocConfig < 16:
+		return 480 << (tocConfig & 1)
+	default:
+		return 120 << (tocConfig & 3)
+	}
+}
+
+// newWith returns a new Ogg reader and Ogg header with an io.Reader input
+func newWith(in io.Reader) (*OggReader, *OggHeader, error) {
+
+	if in == nil {
+		return nil, nil, errNilStream
+	}
+
+	reader := &OggReader{
+		stream: in,
+	}
+
+	header, err := reader.readHeaders()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return reader, header, nil
 }

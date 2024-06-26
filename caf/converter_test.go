@@ -1,7 +1,6 @@
 package caf
 
 import (
-	"bytes"
 	"os"
 	"runtime"
 	"runtime/debug"
@@ -34,10 +33,10 @@ func runTest(t *testing.T, name string, testFunc func()) {
 	endMemory := memoryUsage()
 	duration := time.Since(startTime)
 
-	memoryChange := int64(endMemory - startMemory)
+	memoryChange := float64(endMemory-startMemory) / (1024 * 1024)
 
 	t.Logf("%s - Duration: %v", name, duration)
-	t.Logf("%s - Memory change: %d bytes", name, memoryChange)
+	t.Logf("%s - Memory change: %.2f MB", name, memoryChange)
 }
 
 func TestBasicCafEncodingDecoding(t *testing.T) {
@@ -74,24 +73,50 @@ func TestBasicCafEncodingDecoding(t *testing.T) {
 }
 
 func TestCompareCafFFMpeg(t *testing.T) {
-	runTest(t, "TestCompareCafFFMpeg", func() {
-		inputFile := "samples/sample_large.opus"
-		outputFileFFmpeg := "samples/sample_large.caf"
-		outputFileCode := "output_large_sample.caf"
 
-		defer os.Remove(outputFileCode) // Clean up file after test
+	testCases := []struct {
+		name       string
+		inputFile  string
+		outputFile string
+	}{
+		{"tiny", "samples/tiny.opus", "ffmpeg/tiny.caf"},
+		{"sample_mono_48000", "samples/sample_mono_48000.opus", "ffmpeg/sample_mono_48000.caf"},
+		{"sample_stereo", "samples/sample_stereo.opus", "ffmpeg/sample_stereo.caf"},
+		{"sample_large", "samples/sample_large.opus", "ffmpeg/sample_large.caf"},
+	}
 
-		err := ConvertOpusToCaf(inputFile, outputFileCode)
-		require.NoError(t, err)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			runTest(t, "TestCompareCafFFMpeg", func() {
+				inputFile := tc.inputFile
+				outputFileFFmpeg := tc.outputFile
+				outputFileCode := "output_" + tc.name + ".caf"
 
-		contents1, err := os.ReadFile(outputFileFFmpeg)
-		require.NoError(t, err)
-		contents2, err := os.ReadFile(outputFileCode)
-		require.NoError(t, err)
+				// defer os.Remove(outputFileCode) // Clean up file after test
 
-		require.Equal(t, len(contents1), len(contents2), "File sizes differ")
-		require.Equal(t, contents1, contents2, "File contents differ")
-	})
+				err := ConvertOpusToCaf(inputFile, outputFileCode)
+				require.NoError(t, err)
+
+				contents1, err := os.ReadFile(outputFileFFmpeg)
+				require.NoError(t, err)
+				contents2, err := os.ReadFile(outputFileCode)
+				require.NoError(t, err)
+
+				require.Equal(t, len(contents1), len(contents2), "File sizes differ")
+				if len(contents1) == len(contents2) {
+					for i := range contents1 {
+						if contents1[i] != contents2[i] {
+							t.Errorf("File contents differ at byte index %d: file1=%d, file2=%d", i, contents1[i], contents2[i])
+							break
+						}
+					}
+				} else {
+					require.Equal(t, contents1, contents2, "File contents differ")
+				}
+
+			})
+		})
+	}
 }
 
 func TestConversionWithDifferentOptions(t *testing.T) {
