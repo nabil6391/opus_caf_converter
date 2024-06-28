@@ -23,7 +23,6 @@ var (
 	errBadIDPageType             = errors.New("wrong header, expected beginning of stream")
 	errBadIDPageLength           = errors.New("payload for id page must be 19 bytes")
 	errBadIDPagePayloadSignature = errors.New("bad payload signature")
-	errShortPageHeader           = errors.New("not enough data for payload header")
 )
 
 // OggReader is used to read Ogg files and return page payloads

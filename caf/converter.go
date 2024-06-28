@@ -28,8 +28,8 @@ func ConvertOpusToCaf(inputFile string, outputFile string) error {
 	}
 	defer outFile.Close()
 
-	bufferedReader := bufio.NewReader(inFile)
-	bufferedWriter := bufio.NewWriter(outFile)
+	bufferedReader := bufio.NewReaderSize(inFile, 32*1024) // Increased buffer size
+	bufferedWriter := bufio.NewWriterSize(outFile, 32*1024) // Increased buffer size
 	
 	ogg, header, err := NewWith(bufferedReader)
 	if err != nil {
@@ -46,7 +46,6 @@ func ConvertOpusToCaf(inputFile string, outputFile string) error {
 		return err
 	}
 
-	// Placeholder for frame size, we'll update it later
 	frameSize := uint32(0)
 
 	// Write audio description chunk
@@ -57,7 +56,7 @@ func ConvertOpusToCaf(inputFile string, outputFile string) error {
 			FormatID:          NewFourByteStr("opus"),
 			FormatFlags:       0x00000000,
 			BytesPerPacket:    0,
-			FramesPerPacket:   frameSize, // We'll update this later
+			FramesPerPacket:   frameSize,
 			BitsPerChannel:    0,
 			ChannelsPerPacket: uint32(header.Channels),
 		},
@@ -79,10 +78,9 @@ func ConvertOpusToCaf(inputFile string, outputFile string) error {
 		return err
 	}
 
-	infoChunkSize := int64(25)
 	// Write information chunk
 	infoChunk := CAFChunk{
-		Header:   CAFChunkHeader{ChunkType: ChunkInformation, ChunkSize: infoChunkSize},
+		Header:   CAFChunkHeader{ChunkType: ChunkInformation, ChunkSize: 25},
 		Contents: &CAFStringsChunk{NumEntries: 1, Strings: []Information{{Key: "encoder\x00", Value: "Lavf60.3.100\x00"}}},
 	}
 	if err := infoChunk.Encode(bufferedWriter); err != nil {
@@ -91,7 +89,7 @@ func ConvertOpusToCaf(inputFile string, outputFile string) error {
 
 	dataOffset := bufferedWriter.Buffered()
 	// Write audio data chunk header
-	dataChunkHeader := CAFChunkHeader{ChunkType: ChunkAudioData, ChunkSize: -1} // Use -1 for unknown size
+	dataChunkHeader := CAFChunkHeader{ChunkType: ChunkAudioData, ChunkSize: -1}
 	if err := binary.Write(bufferedWriter, binary.BigEndian, &dataChunkHeader); err != nil {
 		return err
 	}
@@ -101,9 +99,10 @@ func ConvertOpusToCaf(inputFile string, outputFile string) error {
 	if err := binary.Write(bufferedWriter, binary.BigEndian, &editCount); err != nil {
 		return err
 	}
+
 	// Process audio data
 	var totalBytes int64
-	var packetSizes []uint64
+	packetSizes := make([]uint64, 0, 1024) // Pre-allocate slice
 
 	for {
 		segments, pageHeader, err := ogg.ParseNextPage()
@@ -129,11 +128,10 @@ func ConvertOpusToCaf(inputFile string, outputFile string) error {
 			continue
 		}
 
-
 		for _, segment := range segments {
-			
-			totalBytes += int64(len(segment))
-			packetSizes = append(packetSizes, uint64(len(segment)))
+			segmentLen := len(segment)
+			totalBytes += int64(segmentLen)
+			packetSizes = append(packetSizes, uint64(segmentLen))
 
 			if _, err := bufferedWriter.Write(segment); err != nil {
 				return err
@@ -160,21 +158,13 @@ func ConvertOpusToCaf(inputFile string, outputFile string) error {
 		return err
 	}
 
-	// Flush the buffered writer to ensure all data is written to the file
+	// Flush the buffered writer
 	if err := bufferedWriter.Flush(); err != nil {
 		return err
 	}
 
-	// Re-open the file for reading and writing
-	outFile, err = os.OpenFile(outputFile, os.O_RDWR, 0644)
-	if err != nil {
-		return err
-	}
-	defer outFile.Close()
-
 	// Update frame size in audio description chunk
-	frameSizeOffset := int64(40) // CAFFileHeader + CAFChunkHeader + offset within CAFAudioFormat
-	if _, err := outFile.Seek(frameSizeOffset, io.SeekStart); err != nil {
+	if _, err := outFile.Seek(40, io.SeekStart); err != nil {
 		return err
 	}
 	if err := binary.Write(outFile, binary.BigEndian, frameSize); err != nil {
@@ -182,7 +172,7 @@ func ConvertOpusToCaf(inputFile string, outputFile string) error {
 	}
 
 	// Update data chunk size
-	if _, err := outFile.Seek(int64(dataOffset + 4) , io.SeekStart); err != nil {
+	if _, err := outFile.Seek(int64(dataOffset + 4), io.SeekStart); err != nil {
 		return err
 	}
 	if err := binary.Write(outFile, binary.BigEndian, totalBytes+4); err != nil {
@@ -195,22 +185,18 @@ func ConvertOpusToCaf(inputFile string, outputFile string) error {
 func calculatePacketTableLength(trailing_data []uint64) int {
 	packetTableLength := 24
 
-	// // Check how much chunk size is needed each segment by BER encoding
-	for i := 0; i < len(trailing_data); i++ {
-		value := uint32(trailing_data[i])
-		numBytes := 0
-		if (value & 0x7f) == value {
-			numBytes = 1
-		} else if (value & 0x3fff) == value {
-			numBytes = 2
-		} else if (value & 0x1fffff) == value {
-			numBytes = 3
-		} else if (value & 0x0fffffff) == value {
-			numBytes = 4
+	for _, value := range trailing_data {
+		if value < 0x80 {
+			packetTableLength++
+		} else if value < 0x4000 {
+			packetTableLength += 2
+		} else if value < 0x200000 {
+			packetTableLength += 3
+		} else if value < 0x10000000 {
+			packetTableLength += 4
 		} else {
-			numBytes = 5
+			packetTableLength += 5
 		}
-		packetTableLength += numBytes
 	}
 	return packetTableLength
 }
