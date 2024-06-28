@@ -31,7 +31,7 @@ func ConvertOpusToCaf(inputFile string, outputFile string) error {
 	bufferedReader := bufio.NewReader(inFile)
 	bufferedWriter := bufio.NewWriter(outFile)
 	
-	ogg, header, err := newWith(bufferedReader)
+	ogg, header, err := NewWith(bufferedReader)
 	if err != nil {
 		return err
 	}
@@ -115,16 +115,17 @@ func ConvertOpusToCaf(inputFile string, outputFile string) error {
 		}
 
 		segment := segments[0]
-		if pageHeader.index == 2 && len(segment) > 0 {
+		index := pageHeader.Index
+		if index == 2 && len(segment) > 0 {
 			tmptoc := int(segment[0] & 255)
-			frameSize = calculateFrameSize(tmptoc)
+			frameSize = CalculateFrameSize(tmptoc)
 		}
 
-		if pageHeader.index == 1 && bytes.HasPrefix(segment, []byte("OpusTags")) {
+		if index == 1 && bytes.HasPrefix(segment, []byte("OpusTags")) {
 			continue
 		}
 
-		if pageHeader.index <= 2 && bytes.HasPrefix(segment, []byte("OpusHead")) {
+		if index <= 2 && bytes.HasPrefix(segment, []byte("OpusHead")) {
 			continue
 		}
 
