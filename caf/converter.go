@@ -114,21 +114,23 @@ func ConvertOpusToCaf(inputFile string, outputFile string) error {
 			return err
 		}
 
-		if pageHeader.index == 2 && len(segments[0]) > 0 {
-			tmptoc := int(segments[0][0] & 255)
+		segment := segments[0]
+		if pageHeader.index == 2 && len(segment) > 0 {
+			tmptoc := int(segment[0] & 255)
 			frameSize = calculateFrameSize(tmptoc)
 		}
 
+		if pageHeader.index == 1 && bytes.HasPrefix(segment, []byte("OpusTags")) {
+			continue
+		}
+
+		if pageHeader.index <= 2 && bytes.HasPrefix(segment, []byte("OpusHead")) {
+			continue
+		}
+
+
 		for _, segment := range segments {
-			if pageHeader.index == 1 && bytes.HasPrefix(segment, []byte("OpusTags")) {
-			// 	encoder = parseOpusTags(segment)
-				continue
-			}
-
-			if pageHeader.index <= 2 && bytes.HasPrefix(segment, []byte("OpusHead")) {
-				continue
-			}
-
+			
 			totalBytes += int64(len(segment))
 			packetSizes = append(packetSizes, uint64(len(segment)))
 

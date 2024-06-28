@@ -42,7 +42,7 @@ func runTest(t *testing.T, name string, testFunc func()) {
 
 func TestBasicCafEncodingDecoding(t *testing.T) {
 	runTest(t, "TestBasicCafEncodingDecoding", func() {
-		contents, err := os.ReadFile("samples/sample_large.caf")
+		contents, err := os.ReadFile("ffmpeg/sample_large.caf")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -93,7 +93,7 @@ func TestCompareCafFFMpeg(t *testing.T) {
 				outputFileFFmpeg := tc.outputFile
 				outputFileCode := "output_" + tc.name + ".caf"
 
-				// defer os.Remove(outputFileCode) // Clean up file after test
+				defer os.Remove(outputFileCode) // Clean up file after test
 
 				err := ConvertOpusToCaf(inputFile, outputFileCode)
 				require.NoError(t, err)

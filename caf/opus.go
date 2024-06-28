@@ -1,11 +1,9 @@
 package caf
 
 import (
-	"bytes"
 	"encoding/binary"
 	"errors"
 	"io"
-	"strings"
 )
 
 // Opus Decoding
@@ -131,47 +129,6 @@ func (o *OggReader) ParseNextPage() ([][]byte, *OggPageHeader, error) {
 	}
 
 	return segments, pageHeader, nil
-}
-
-
-
-func parseOpusTags(segment []byte) string {
-	r := bytes.NewReader(segment[8:]) // Skip "OpusTags"
-
-	// Read vendor string length
-	var vendorLength uint32
-	if err := binary.Read(r, binary.LittleEndian, &vendorLength); err != nil {
-		return ""
-	}
-
-	// Skip vendor string
-	if _, err := r.Seek(int64(vendorLength), io.SeekCurrent); err != nil {
-		return ""
-	}
-
-	// Read user comment list length
-	var commentListLength uint32
-	if err := binary.Read(r, binary.LittleEndian, &commentListLength); err != nil {
-		return ""
-	}
-
-	// Read user comments
-	for i := uint32(0); i < commentListLength; i++ {
-		var commentLength uint32
-		if err := binary.Read(r, binary.LittleEndian, &commentLength); err != nil {
-			return ""
-		}
-
-		commentBytes := make([]byte, commentLength)
-		if _, err := io.ReadFull(r, commentBytes); err != nil {
-			return ""
-		}
-		comment := string(commentBytes)
-		if strings.HasPrefix(comment, "ENCODER=") {
-			return strings.TrimPrefix(comment, "ENCODER=")
-		}	}
-
-	return ""
 }
 
 
